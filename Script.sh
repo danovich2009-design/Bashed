@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# ==========================================
+
 # Configuration & Global Variables
-# ==========================================
+
 TARGET_DIR="./test_zone"
 BACKUP_DIR="./backups"
 LOG_FILE="./homelab.log"
 
-# Automatically create sample files if target directory doesn't exist (ideal for demos)
+
 if [ ! -d "$TARGET_DIR" ]; then
     mkdir -p "$TARGET_DIR"
     touch "$TARGET_DIR/vacation_photo.jpg" \
@@ -28,9 +28,9 @@ CYAN='\033[0;36m'
 PURPLE='\033[0;35m'
 NC='\033[0m'
 
-# ==========================================
+
 # Helper Functions
-# ==========================================
+
 log_event() {
     local message="$1"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" >> "$LOG_FILE"
@@ -49,9 +49,9 @@ print_header() {
     echo -e "${CYAN}========================================${NC}\n"
 }
 
-# ==========================================
+
 # Module 1: System Health Monitor
-# ==========================================
+
 health_monitor() {
     print_header "SYSTEM HEALTH MONITOR"
 
@@ -90,9 +90,9 @@ health_monitor() {
     pause
 }
 
-# ==========================================
+
 # Module 2: File Organizer
-# ==========================================
+
 organize_files() {
     print_header "FILE ORGANIZER"
     echo -e "Current folder: ${YELLOW}$TARGET_DIR${NC}\n"
@@ -149,9 +149,9 @@ organize_files() {
     pause
 }
 
-# ==========================================
-# Module 3: Safe Junk Cleaner
-# ==========================================
+
+# Module 3: Junk Cleaner
+
 clean_junk() {
     print_header "JUNK & TEMP FILE CLEANER"
     echo -e "Scanning: ${YELLOW}$TARGET_DIR${NC}\n"
@@ -188,9 +188,9 @@ clean_junk() {
     pause
 }
 
-# ==========================================
+
 # Module 4: Automated Compressed Backups
-# ==========================================
+
 create_backup() {
     print_header "AUTOMATED BACKUP MANAGER"
 
@@ -224,9 +224,9 @@ create_backup() {
     pause
 }
 
-# ==========================================
+
 # Module 5: Storage & Duplicate Audit
-# ==========================================
+
 storage_audit() {
     print_header "STORAGE & DUPLICATE FILE AUDIT"
     echo -e "Analyzing: ${YELLOW}$TARGET_DIR${NC}\n"
@@ -267,9 +267,8 @@ storage_audit() {
     pause
 }
 
-# ==========================================
+
 # Module 6: Process & Network Inspector
-# ==========================================
 network_and_processes() {
     print_header "PROCESS & NETWORK INSPECTOR"
 
@@ -292,9 +291,8 @@ network_and_processes() {
     pause
 }
 
-# ==========================================
-# Module 7: Change Working Directory
-# ==========================================
+# Module 7: Directory
+
 change_directory() {
     print_header "CHANGE TARGET DIRECTORY"
     echo -e "Current path: ${YELLOW}$TARGET_DIR${NC}\n"
@@ -310,9 +308,8 @@ change_directory() {
     pause
 }
 
-# ==========================================
+
 # Main Menu Loop
-# ==========================================
 while true; do
     clear
 
