@@ -1,234 +1,366 @@
 #!/usr/bin/env bash
 
+# ==========================================
+# Configuration & Global Variables
+# ==========================================
+TARGET_DIR="./test_zone"
+BACKUP_DIR="./backups"
+LOG_FILE="./homelab.log"
 
-# Configuración y variables globales
-
-CARPETA_OBJETIVO="./zona_pruebas"
-ARCHIVO_LOG="./homelab.log"
-
-
-if [ ! -d "$CARPETA_OBJETIVO" ]; then
-    mkdir -p "$CARPETA_OBJETIVO"
-    touch "$CARPETA_OBJETIVO/foto_vacaciones.jpg" \
-          "$CARPETA_OBJETIVO/apuntes_clase.pdf" \
-          "$CARPETA_OBJETIVO/respaldo_viejo.tmp" \
-          "$CARPETA_OBJETIVO/archivo_vacio.txt"
+# Automatically create sample files if target directory doesn't exist (ideal for demos)
+if [ ! -d "$TARGET_DIR" ]; then
+    mkdir -p "$TARGET_DIR"
+    touch "$TARGET_DIR/vacation_photo.jpg" \
+          "$TARGET_DIR/class_notes.pdf" \
+          "$TARGET_DIR/project_report.docx" \
+          "$TARGET_DIR/demo_track.mp3" \
+          "$TARGET_DIR/old_backup.tmp" \
+          "$TARGET_DIR/empty_file.txt"
+    echo "Sample data for duplicate check" > "$TARGET_DIR/copy_1.txt"
+    echo "Sample data for duplicate check" > "$TARGET_DIR/copy_2.txt"
 fi
 
-# Colores para la terminal
-VERDE='\033[0;32m'
-AMARILLO='\033[1;33m'
-ROJO='\033[0;31m'
-AZUL='\033[0;36m'
-SIN_COLOR='\033[0m'
+# Terminal colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+PURPLE='\033[0;35m'
+NC='\033[0m'
 
-
-# Funciones auxiliares
-
-registrar_evento() {
-    local mensaje="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $mensaje" >> "$ARCHIVO_LOG"
+# ==========================================
+# Helper Functions
+# ==========================================
+log_event() {
+    local message="$1"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" >> "$LOG_FILE"
 }
 
-pausar() {
+pause() {
     echo ""
-    read -rp "Presiona [Enter] para volver al menú..."
+    read -rp "Press [Enter] to return to the menu..."
 }
 
-
-# Módulo 1: Monitor de salud del sistema
-
-monitor_salud() {
+print_header() {
+    local title="$1"
     clear
-    echo -e "${AZUL}=== MONITOR DE SALUD DEL SISTEMA ===${SIN_COLOR}\n"
+    echo -e "${CYAN}========================================${NC}"
+    echo -e "${CYAN}  $title${NC}"
+    echo -e "${CYAN}========================================${NC}\n"
+}
 
-    echo -e "${AMARILLO} Espacio en discos:${SIN_COLOR}"
+# ==========================================
+# Module 1: System Health Monitor
+# ==========================================
+health_monitor() {
+    print_header "SYSTEM HEALTH MONITOR"
+
+    echo -e "${YELLOW}Host & Uptime:${NC}"
+    echo "Hostname: $(hostname)"
+    if command -v uptime > /dev/null 2>&1; then
+        echo "Uptime: $(uptime -p 2>/dev/null || uptime)"
+    fi
+    echo ""
+
+    echo -e "${YELLOW}Disk Space:${NC}"
     df -h | grep -E "Filesystem|C:|D:|/$"
     echo ""
 
-    echo -e "${AMARILLO} Memoria RAM:${SIN_COLOR}"
+    echo -e "${YELLOW}Memory (RAM):${NC}"
     if command -v free > /dev/null 2>&1; then
-        free -h | awk '/^Mem:/ {print "Total: " $2 " | Usada: " $3 " | Libre: " $4}'
+        free -h | awk '/^Mem:/ {print "Total: " $2 " | Used: " $3 " | Free: " $4}'
     elif command -v powershell.exe > /dev/null 2>&1; then
         powershell.exe -NoProfile -Command "
             \$os = Get-CimInstance Win32_OperatingSystem;
             \$total = [math]::Round(\$os.TotalVisibleMemorySize / 1MB, 2);
-            \$libre = [math]::Round(\$os.FreePhysicalMemory / 1MB, 2);
-            Write-Host \"Total: \$total GB | Libre: \$libre GB\"
+            \$free = [math]::Round(\$os.FreePhysicalMemory / 1MB, 2);
+            Write-Host \"Total: \$total GB | Free: \$free GB\"
         "
     fi
     echo ""
 
-    echo -e "${AMARILLO} Estado de conexión a Internet:${SIN_COLOR}"
-    if ping -c 1 8.8.8.8 > /dev/null 2>&1 || ping -n 1 8.8.8.8 > /dev/null 2>&1; then
-        echo -e "Conexión: ${VERDE}EN LÍNEA${SIN_COLOR}"
+    echo -e "${YELLOW}Internet Connection Status:${NC}"
+    if curl -Is --connect-timeout 3 https://1.1.1 > /dev/null 2>&1 || curl -Is --connect-timeout 3 https://google.com > /dev/null 2>&1; then
+        echo -e "Connection: ${GREEN}ONLINE${NC}"
     else
-        echo -e "Conexión: ${ROJO}SIN INTERNET${SIN_COLOR}"
+        echo -e "Connection: ${RED}OFFLINE${NC}"
     fi
 
-    registrar_evento "Consulta de estado de salud del sistema."
-    pausar
-}
-
-
-# Módulo 2: Organizador de archivos
-
-organizar_archivos() {
-    clear
-    echo -e "${AZUL}=== ORGANIZADOR DE ARCHIVOS ===${SIN_COLOR}"
-    echo -e "Carpeta actual: ${AMARILLO}$CARPETA_OBJETIVO${SIN_COLOR}\n"
-
-    if [ ! -d "$CARPETA_OBJETIVO" ]; then
-        echo -e "${ROJO}Error: La carpeta no existe.${SIN_COLOR}"
-        pausar
-        return
-    fi
-
-    local movidos=0
-
-    for archivo in "$CARPETA_OBJETIVO"/*; do
-        [ -f "$archivo" ] || continue
-
-        local nombre_base
-        nombre_base=$(basename "$archivo")
-        local extension="${nombre_base##*.}"
-        extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
-
-        local destino=""
-        case "$extension" in
-            jpg|jpeg|png|gif|webp|svg)
-                destino="Imagenes"
-                ;;
-            pdf|doc|docx|txt|xlsx|pptx|csv)
-                destino="Documentos"
-                ;;
-            mp4|mkv|avi|mov)
-                destino="Videos"
-                ;;
-            mp3|wav|flac|ogg)
-                destino="Audio"
-                ;;
-            zip|rar|7z|tar|gz)
-                destino="Comprimidos"
-                ;;
-            exe|msi)
-                destino="Instaladores"
-                ;;
-            *)
-                continue
-                ;;
-        esac
-
-        mkdir -p "$CARPETA_OBJETIVO/$destino"
-        mv "$archivo" "$CARPETA_OBJETIVO/$destino/"
-        echo -e "Movido: ${VERDE}$nombre_base${SIN_COLOR} -> $destino/"
-        ((movidos++))
-    done
-
-    echo -e "\nTotal de archivos organizados: ${VERDE}$movidos${SIN_COLOR}"
-    registrar_evento "Organizados $movidos archivos en $CARPETA_OBJETIVO."
-    pausar
+    log_event "Checked system health status."
+    pause
 }
 
 # ==========================================
-# Módulo 3: Limpiador seguro
+# Module 2: File Organizer
+# ==========================================
+organize_files() {
+    print_header "FILE ORGANIZER"
+    echo -e "Current folder: ${YELLOW}$TARGET_DIR${NC}\n"
 
-limpiar_basura() {
-    clear
-    echo -e "${AZUL}=== LIMPIADOR DE ARCHIVOS INNECESARIOS ===${SIN_COLOR}"
-    echo -e "Analizando: ${AMARILLO}$CARPETA_OBJETIVO${SIN_COLOR}\n"
-
-    local candidatos=()
-    while IFS= read -r -d '' f; do
-        candidatos+=("$f")
-    done < <(find "$CARPETA_OBJETIVO" -maxdepth 1 -type f \( -name "*.tmp" -o -name "*.bak" -o -size 0 \) -print0)
-
-    if [ ${#candidatos[@]} -eq 0 ]; then
-        echo -e "${VERDE}¡Todo limpio! No se encontraron archivos temporales ni vacíos.${SIN_COLOR}"
-        pausar
+    if [ ! -d "$TARGET_DIR" ]; then
+        echo -e "${RED}Error: Directory does not exist.${NC}"
+        pause
         return
     fi
 
-    echo "Se encontraron los siguientes archivos:"
-    for item in "${candidatos[@]}"; do
-        echo -e " - ${ROJO}$(basename "$item")${SIN_COLOR}"
+    local moved=0
+
+    for file in "$TARGET_DIR"/*; do
+        [ -f "$file" ] || continue
+
+        local base_name
+        base_name=$(basename "$file")
+        local extension="${base_name##*.}"
+        extension=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
+
+        local destination=""
+        case "$extension" in
+            jpg|jpeg|png|gif|webp|svg)
+                destination="Images"
+                ;;
+            pdf|doc|docx|txt|xlsx|pptx|csv|md)
+                destination="Documents"
+                ;;
+            mp4|mkv|avi|mov|webm)
+                destination="Videos"
+                ;;
+            mp3|wav|flac|ogg|m4a)
+                destination="Audio"
+                ;;
+            zip|rar|7z|tar|gz)
+                destination="Archives"
+                ;;
+            exe|msi|sh|py|js)
+                destination="Scripts_and_Apps"
+                ;;
+            *)
+                destination="Misc"
+                ;;
+        esac
+
+        mkdir -p "$TARGET_DIR/$destination"
+        mv "$file" "$TARGET_DIR/$destination/"
+        echo -e "Moved: ${GREEN}$base_name${NC} -> $destination/"
+        ((moved++))
+    done
+
+    echo -e "\nTotal files organized: ${GREEN}$moved${NC}"
+    log_event "Organized $moved files in $TARGET_DIR."
+    pause
+}
+
+# ==========================================
+# Module 3: Safe Junk Cleaner
+# ==========================================
+clean_junk() {
+    print_header "JUNK & TEMP FILE CLEANER"
+    echo -e "Scanning: ${YELLOW}$TARGET_DIR${NC}\n"
+
+    local candidates=()
+    while IFS= read -r -d '' f; do
+        candidates+=("$f")
+    done < <(find "$TARGET_DIR" -maxdepth 2 -type f \( -name "*.tmp" -o -name "*.bak" -o -name "*.swp" -o -size 0 \) -print0)
+
+    if [ ${#candidates[@]} -eq 0 ]; then
+        echo -e "${GREEN}All clean! No temporary or empty files found.${NC}"
+        pause
+        return
+    fi
+
+    echo "The following files were found:"
+    for item in "${candidates[@]}"; do
+        echo -e " - ${RED}$item${NC}"
     done
 
     echo ""
-    read -rp "¿Deseas eliminar estos ${#candidatos[@]} archivos permanentemente? (s/n): " confirmar
+    read -rp "Do you want to permanently delete these ${#candidates[@]} files? (y/n): " confirm
 
-    if [[ "$confirmar" == "s" || "$confirmar" == "S" ]]; then
-        for item in "${candidatos[@]}"; do
+    if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+        for item in "${candidates[@]}"; do
             rm -f "$item"
         done
-        echo -e "${VERDE}Archivos eliminados correctamente.${SIN_COLOR}"
-        registrar_evento "Eliminados ${#candidatos[@]} archivos basura en $CARPETA_OBJETIVO."
+        echo -e "${GREEN}Files deleted successfully.${NC}"
+        log_event "Deleted ${#candidates[@]} junk files in $TARGET_DIR."
     else
-        echo "Operación cancelada. No se borró nada."
+        echo "Operation canceled. Nothing was deleted."
     fi
 
-    pausar
+    pause
 }
 
+# ==========================================
+# Module 4: Automated Compressed Backups
+# ==========================================
+create_backup() {
+    print_header "AUTOMATED BACKUP MANAGER"
 
-# Módulo 4: Cambiar carpeta de trabajo
-
-cambiar_carpeta() {
-    clear
-    echo -e "${AZUL}=== CAMBIAR CARPETA OBJETIVO ===${SIN_COLOR}"
-    echo -e "Ruta actual: ${AMARILLO}$CARPETA_OBJETIVO${SIN_COLOR}\n"
-    read -rp "Escribe la nueva ruta (ej. /tmp): " nueva_ruta
-
-    if [ -d "$nueva_ruta" ]; then
-        CARPETA_OBJETIVO="$nueva_ruta"
-        echo -e "${VERDE}Carpeta actualizada con éxito.${SIN_COLOR}"
-        registrar_evento "Cambio de carpeta objetivo a $CARPETA_OBJETIVO."
-    else
-        echo -e "${ROJO}La ruta no es válida o no existe.${SIN_COLOR}"
+    if [ ! -d "$TARGET_DIR" ]; then
+        echo -e "${RED}Error: Target directory '$TARGET_DIR' does not exist.${NC}"
+        pause
+        return
     fi
-    pausar
+
+    mkdir -p "$BACKUP_DIR"
+    local timestamp
+    timestamp=$(date '+%Y%m%d_%H%M%S')
+    local folder_name
+    folder_name=$(basename "$TARGET_DIR")
+    local backup_file="$BACKUP_DIR/${folder_name}_backup_${timestamp}.tar.gz"
+
+    echo -e "Compressing ${YELLOW}$TARGET_DIR${NC}..."
+    if tar -czf "$backup_file" -C "$(dirname "$TARGET_DIR")" "$folder_name" 2>/dev/null; then
+        local size
+        size=$(du -h "$backup_file" | cut -f1)
+        echo -e "${GREEN}✔ Backup created successfully!${NC}"
+        echo -e "File: ${CYAN}$backup_file${NC} ($size)"
+        log_event "Created backup $backup_file ($size)."
+    else
+        echo -e "${RED}Failed to create backup archive.${NC}"
+        log_event "Backup failed for $TARGET_DIR."
+    fi
+
+    echo -e "\n${YELLOW}Existing Backups:${NC}"
+    ls -lh "$BACKUP_DIR" 2>/dev/null | awk 'NR>1 {print " - " $9 " (" $5 ")"}'
+    pause
 }
 
+# ==========================================
+# Module 5: Storage & Duplicate Audit
+# ==========================================
+storage_audit() {
+    print_header "STORAGE & DUPLICATE FILE AUDIT"
+    echo -e "Analyzing: ${YELLOW}$TARGET_DIR${NC}\n"
 
-# Bucle principal (Menú)
+    if [ ! -d "$TARGET_DIR" ]; then
+        echo -e "${RED}Directory not found.${NC}"
+        pause
+        return
+    fi
 
+    local total_files
+    total_files=$(find "$TARGET_DIR" -type f | wc -l)
+    local total_size
+    total_size=$(du -sh "$TARGET_DIR" 2>/dev/null | cut -f1)
+
+    echo -e "Total files: ${GREEN}$total_files${NC}"
+    echo -e "Total folder size: ${GREEN}$total_size${NC}\n"
+
+    echo -e "${YELLOW}Top 5 Largest Files:${NC}"
+    find "$TARGET_DIR" -type f -exec du -h {} + 2>/dev/null | sort -rh | head -n 5 | awk '{print " - " $2 " (" $1 ")"}'
+    echo ""
+
+    echo -e "${YELLOW}Duplicate File Check (SHA-256):${NC}"
+    if command -v sha256sum > /dev/null 2>&1; then
+        local duplicates
+        duplicates=$(find "$TARGET_DIR" -type f -exec sha256sum {} + 2>/dev/null | sort | uniq -w64 -D)
+        if [ -n "$duplicates" ]; then
+            echo -e "${RED}Duplicate files detected:${NC}"
+            echo "$duplicates" | awk '{print " - [" substr($1,1,10) "...] " $2}'
+        else
+            echo -e "${GREEN}No exact duplicate files found.${NC}"
+        fi
+    else
+        echo "sha256sum utility not available on this system."
+    fi
+
+    log_event "Ran storage and duplicate audit on $TARGET_DIR."
+    pause
+}
+
+# ==========================================
+# Module 6: Process & Network Inspector
+# ==========================================
+network_and_processes() {
+    print_header "PROCESS & NETWORK INSPECTOR"
+
+    echo -e "${YELLOW}Local Network Interfaces:${NC}"
+    if command -v ip > /dev/null 2>&1; then
+        ip -brief addr show 2>/dev/null
+    elif command -v hostname > /dev/null 2>&1; then
+        hostname -I 2>/dev/null || echo "Local IP check unavailable."
+    fi
+    echo ""
+
+    echo -e "${YELLOW}Top Running Processes:${NC}"
+    if ps aux > /dev/null 2>&1; then
+        ps aux --sort=-%mem 2>/dev/null | head -n 6 | awk '{printf "%-10s %-8s %-6s %s\n", $1, $2, $4"%", $11}'
+    else
+        ps -ef | head -n 6
+    fi
+
+    log_event "Inspected running processes and network info."
+    pause
+}
+
+# ==========================================
+# Module 7: Change Working Directory
+# ==========================================
+change_directory() {
+    print_header "CHANGE TARGET DIRECTORY"
+    echo -e "Current path: ${YELLOW}$TARGET_DIR${NC}\n"
+    read -rp "Enter the new path (e.g., /tmp or ./test_zone): " new_path
+
+    if [ -d "$new_path" ]; then
+        TARGET_DIR="$new_path"
+        echo -e "${GREEN}Directory updated successfully.${NC}"
+        log_event "Changed target directory to $TARGET_DIR."
+    else
+        echo -e "${RED}Invalid path or directory does not exist.${NC}"
+    fi
+    pause
+}
+
+# ==========================================
+# Main Menu Loop
+# ==========================================
 while true; do
     clear
-    echo -e "${AZUL}========================================${SIN_COLOR}"
-    echo -e "${AZUL}       HOMELAB LOCAL - CONTROL PANEL    ${SIN_COLOR}"
-    echo -e "${AZUL}========================================${SIN_COLOR}"
-    echo -e "Carpeta activa: ${AMARILLO}$CARPETA_OBJETIVO${SIN_COLOR}\n"
-    echo "1. Monitor de salud (Discos, RAM y Red)"
-    echo "2. Organizar archivos por categoría"
-    echo "3. Limpiar archivos temporales y vacíos"
-    echo "4. Cambiar carpeta de trabajo"
-    echo "5. Ver historial de actividad (Logs)"
-    echo "6. Salir"
-    echo ""
-    read -rp "Selecciona una opción [1-6]: " opcion
 
-    case "$opcion" in
-        1) monitor_salud ;;
-        2) organizar_archivos ;;
-        3) limpiar_basura ;;
-        4) cambiar_carpeta ;;
-        5)
-            clear
-            echo -e "${AZUL}=== HISTORIAL DE ACTIVIDAD ===${SIN_COLOR}\n"
-            if [ -f "$ARCHIVO_LOG" ]; then
-                cat "$ARCHIVO_LOG"
-            else
-                echo "Aún no hay registros guardados."
-            fi
-            pausar
-            ;;
-        6)
-            echo -e "\n${VERDE}Cerrando Homelab Local. ¡Hasta luego!${SIN_COLOR}"
-            exit 0
-            ;;
-        *)
-            echo -e "\n${ROJO}Opción inválida.${SIN_COLOR}"
-            sleep 1
-            ;;
-    esac
+echo -e "${PURPLE}========================================${NC}"
+echo -e "${PURPLE}       LOCAL HOMELAB - CONTROL PANEL    ${NC}"
+echo -e "${PURPLE}========================================${NC}"
+echo -e "Active folder: ${YELLOW}$TARGET_DIR${NC}\n"
+echo "1. System health monitor (Disks, RAM & Network)"
+echo "2. Organize files by category"
+echo "3. Clean temporary and empty files"
+echo "4. Create compressed backup (.tar.gz)"
+echo "5. Storage & duplicate file audit"
+echo "6. Process & network inspector"
+echo "7. Change working directory"
+echo "8. View or clear activity logs"
+echo "9. Exit"
+echo ""
+read -rp "Select an option [1-9]: " option
+case "$option" in
+1) health_monitor ;;
+2) organize_files ;;
+3) clean_junk ;;
+4) create_backup ;;
+5) storage_audit ;;
+6) network_and_processes ;;
+7) change_directory ;;
+8)
+print_header "ACTIVITY HISTORY (LOGS)"
+if [ -f "$LOG_FILE" ]; then
+cat "$LOG_FILE"
+echo ""
+read -rp "Do you want to clear the log file? (y/n): " clear_log
+if [[ "$clear_log" == "y" || "$clear_log" == "Y" ]]; then
+> "$LOG_FILE"
+echo -e "${GREEN}Logs cleared.${NC}"
+fi
+else
+echo "No logs recorded yet."
+fi
+pause
+;;
+9)
+echo -e "\n${GREEN}Shutting down Local Homelab. Goodbye!${NC}"
+exit 0
+;;
+*)
+echo -e "\n${RED}Invalid option.${NC}"
+sleep 1
+;;
+esac
 done
